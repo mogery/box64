@@ -1299,8 +1299,8 @@ GO(pclose, iFp)
 GO(perror, vFp)
 GOW(personality, iFL)
 GO(__pipe, iFp)
-GOW(pipe, iFp)
-GOW(pipe2, iFpO)
+GOWM(pipe, iFEp)
+GOWM(pipe2, iFEpO)
 //GO(pivot_root, // Deprecated
 GO(pkey_alloc, iFuu)
 GO(pkey_free, iFi)
@@ -1458,7 +1458,7 @@ GO(rcmd, iFpWpppp)
 GO(rcmd_af, iFpWppppW)
 //DATAB(__rcmd_errstr, 
 GOW(__read, lFipL)
-GO(read, lFipL)
+GOM(read, lFEipL)
 GOW(readahead, lFilL)
 GO(__read_chk, lFipLL)
 GOW(readdir, pFp) // struct dirent is 280 bytes on x86_64 and ARM64
@@ -2201,7 +2201,7 @@ GO(wordfree, vFp)
 //GO(wprintf, iFpV)
 //GO(__wprintf_chk, 
 GOW(__write, lFipL)
-GOW(write, lFipL)
+GOWM(write, lFEipL)
 //GO(__write_nocancel, 
 GOW(writev, lFipi)
 //GO(wscanf, iFpV)

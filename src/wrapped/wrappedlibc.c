@@ -61,6 +61,8 @@
 #include "bridge.h"
 #include "globalsymbols.h"
 
+#define MIN(a,b) (((a)<(b))?(a):(b))
+
 #define LIBNAME libc
 const char* libcName = "libc.so.6";
 
@@ -2527,6 +2529,108 @@ EXPORT int my_iopl(x64emu_t* emu, int level)
     // For now, lets just return "unsupported"
     errno = ENOSYS;
     return -1;
+}
+
+pipe_bodge_t* find_pipe(x64emu_t* emu, int fd)
+{
+    pipe_bodge_t* ptr = emu->pipes;
+    while (ptr != NULL) {
+        if (ptr->fd_r == fd || ptr->fd_w == fd) {
+            break;
+        }
+
+        ptr = ptr->next;
+    }
+
+    return ptr;
+}
+
+EXPORT ssize_t my_read(x64emu_t* emu, int fd, const void *buf, size_t count)
+{
+    pipe_bodge_t* p = find_pipe(emu, fd);
+
+    if (p == NULL) {
+        return read(fd, buf, count);
+    }
+
+    if (p->fd_r != fd) {
+        errno = EBADF;
+        return -1;
+    }
+
+    long readable = (long)(p->bytes_written - p->bytes_read);
+    ssize_t bytes = MIN(readable, count);
+
+    printf("Read1");
+
+    // TODO: handle wrapping
+    memcpy(buf, p->buffer + p->bytes_read, bytes);
+    p->bytes_read += bytes;
+
+    printf("Read2\n");
+    
+    return bytes;
+}
+
+EXPORT ssize_t my_write(x64emu_t* emu, int fd, void *buf, size_t count)
+{
+    pipe_bodge_t* p = find_pipe(emu, fd);
+
+    if (p == NULL) {
+        return write(fd, buf, count);
+    }
+
+    if (p->fd_w != fd) {
+        errno = EBADF;
+        return -1;
+    }
+    printf("Written1");
+
+    // TODO: handle wrapping
+    memcpy(p->buffer + p->bytes_written, buf, count);
+    p->bytes_written += count;
+
+    printf("Written2\n");
+
+    return count;
+}
+
+EXPORT int my_pipe2(x64emu_t* emu, int pipefd[2], int flags)
+{
+    pipe_bodge_t* p = malloc(sizeof(pipe_bodge_t));
+
+    int fd = 0x40000000;
+    if (emu->pipes != NULL) {
+        fd = emu->pipes->fd_w + 1;
+    }
+
+    p->fd_r = fd;
+    p->fd_w = fd + 1;
+
+    pipefd[0] = p->fd_r;
+    pipefd[1] = p->fd_w;
+
+    // TODO: allocate actual buffer
+    p->size = sysconf(_SC_PAGE_SIZE) * 16;
+    p->buffer = mmap(NULL, p->size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (p->buffer == -1) {
+        printf("BUFFER MMAP ERROR %s\n", strerror(errno));
+    }
+
+    p->bytes_read = 0;
+    p->bytes_written = 0;
+
+    p->next = emu->pipes;
+    emu->pipes = p;
+
+    printf("pipe mapped: %p %ld\n", p->buffer, p->size);
+
+    //return pipe2(pipefd, flags);
+}
+
+EXPORT int my_pipe(x64emu_t* emu, int pipefd[2])
+{
+    return my_pipe2(emu, pipefd, 0);
 }
 
 EXPORT char** my_environ = NULL;

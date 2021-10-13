@@ -25,6 +25,19 @@ typedef union multiuint_s {
     uint64_t    u64;
 } multiuint_t;
 
+typedef struct pipe_bodge_s {
+    int fd_r;
+    int fd_w;
+
+    void* buffer;
+    ssize_t size;
+
+    unsigned long bytes_read;
+    unsigned long bytes_written;
+
+    void* next;
+} pipe_bodge_t;
+
 typedef struct x64emu_s {
     // cpu
 	reg64_t     regs[16];
@@ -84,6 +97,8 @@ typedef struct x64emu_s {
     x64_ucontext_t *uc_link; // to handle setcontext
 
     int         type;       // EMUTYPE_xxx define
+
+    pipe_bodge_t   *pipes;
 
 } x64emu_t;
 

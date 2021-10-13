@@ -321,6 +321,7 @@
 #() iFEpL
 #() iFEpp
 #() iFEpV
+#() iFEpO
 #() iFEpA
 #() iFESp
 #() iFwww
@@ -755,6 +756,7 @@
 #() UFppip
 #() UFpppp
 #() dFpppp
+#() lFEipL
 #() lFEpip
 #() lFEppL
 #() lFEppp
@@ -2396,6 +2398,7 @@ wrappedlibc:
 - iFp:
   - _setjmp
   - getcontext
+  - pipe
   - setcontext
   - setjmp
   - uname
@@ -2436,6 +2439,8 @@ wrappedlibc:
   - execl
   - execlp
   - printf
+- iFpO:
+  - pipe2
 - iFpA:
   - vprintf
 - iFSp:
@@ -2513,6 +2518,9 @@ wrappedlibc:
   - __open
   - open
   - open64
+- lFipL:
+  - read
+  - write
 - lFppL:
   - readlink
 - pFpip:

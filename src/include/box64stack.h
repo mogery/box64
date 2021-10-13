@@ -5,6 +5,7 @@
 
 typedef struct box64context_s box64context_t;
 typedef struct x64emu_s x64emu_t;
+typedef struct pipe_bodge_s pipe_bodge_t;
 
 int CalcStackSize(box64context_t *context);
 void SetupInitialStack(x64emu_t *emu);
