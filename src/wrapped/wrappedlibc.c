@@ -2558,16 +2558,28 @@ EXPORT ssize_t my_read(x64emu_t* emu, int fd, const void *buf, size_t count)
         return -1;
     }
 
+    // TODO: replace with futex probably
+    while(p->bytes_written - p->bytes_read == 0) {
+        usleep(10);
+    }
+
     long readable = (long)(p->bytes_written - p->bytes_read);
     ssize_t bytes = MIN(readable, count);
 
-    printf("Read1");
+    if ((p->bytes_read + bytes) / p->size != p->bytes_read / p->size) { // wrapped
+        ssize_t first_batch = p->size - (p->bytes_read % p->size);
+        memcpy(buf, p->buffer + (p->bytes_read % p->size), first_batch);
+        memcpy(buf + first_batch, p->buffer, bytes - first_batch);
+    } else { // simple
+        memcpy(buf, p->buffer + (p->bytes_read % p->size), bytes);
+    }
 
-    // TODO: handle wrapping
-    memcpy(buf, p->buffer + p->bytes_read, bytes);
     p->bytes_read += bytes;
 
-    printf("Read2\n");
+    // if ((p->bytes_read / p->size) == (p->bytes_written / p->size)) { // modulo heads when matchup
+    //     p->bytes_read = p->bytes_read % p->size;
+    //     p->bytes_written = p->bytes_written % p->size;
+    // }
     
     return bytes;
 }
@@ -2584,20 +2596,28 @@ EXPORT ssize_t my_write(x64emu_t* emu, int fd, void *buf, size_t count)
         errno = EBADF;
         return -1;
     }
-    printf("Written1");
 
-    // TODO: handle wrapping
-    memcpy(p->buffer + p->bytes_written, buf, count);
+    if ((p->bytes_written + count) / p->size != p->bytes_written / p->size) { // wrapped
+        ssize_t first_batch = p->size - (p->bytes_written % p->size);
+        memcpy(p->buffer + (p->bytes_written % p->size), buf, first_batch);
+        memcpy(p->buffer, buf + first_batch, count - first_batch);
+    } else { // simple
+        memcpy(p->buffer + (p->bytes_written % p->size), buf, count);
+    }
+
     p->bytes_written += count;
-
-    printf("Written2\n");
 
     return count;
 }
 
 EXPORT int my_pipe2(x64emu_t* emu, int pipefd[2], int flags)
 {
-    pipe_bodge_t* p = malloc(sizeof(pipe_bodge_t));
+    //pipe_bodge_t* p = malloc(sizeof(pipe_bodge_t));
+    pipe_bodge_t* p = (pipe_bodge_t*)mmap(NULL, sizeof(pipe_bodge_t), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    if (p == -1) {
+        printf("failed to map shared memory for pipe_bodge_t: %s\n", strerror(errno));
+        return -1;
+    }
 
     int fd = 0x40000000;
     if (emu->pipes != NULL) {
@@ -2610,11 +2630,11 @@ EXPORT int my_pipe2(x64emu_t* emu, int pipefd[2], int flags)
     pipefd[0] = p->fd_r;
     pipefd[1] = p->fd_w;
 
-    // TODO: allocate actual buffer
     p->size = sysconf(_SC_PAGE_SIZE) * 16;
     p->buffer = mmap(NULL, p->size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (p->buffer == -1) {
-        printf("BUFFER MMAP ERROR %s\n", strerror(errno));
+        printf("failed to map buffer for pipe_bodge_t: %s\n", strerror(errno));
+        return -1;
     }
 
     p->bytes_read = 0;
